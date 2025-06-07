@@ -1,0 +1,32 @@
+<div class="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+  <div class="text-center space-y-4">
+    <h2 class="text-3xl font-bold text-gray-800">¡Bienvenido al Menú Principal!</h2>
+
+    <p *ngIf="userEmail" class="text-xl text-gray-700">
+      Has iniciado sesión como: <span class="font-semibold text-blue-600">{{ userEmail }}</span>
+    </p>
+    <p *ngIf="isAdmin" class="text-green-600 font-semibold">
+      Tienes permisos de Administrador.
+    </p>
+    <p *ngIf="!isAdmin" class="text-orange-600 font-semibold">
+      Tu rol es de Usuario.
+    </p>
+
+    <div class="text-sm text-gray-500 mt-4">
+      <p>TMDB API Key: {{ tmdbApiKey || 'N/A' }}</p>
+      <p>TMDB Account ID: {{ tmdbAccountId || 'N/A' }}</p>
+    </div>
+
+    <div class="mt-6 flex justify-center space-x-4">
+      <button (click)="logout()" class="py-2 px-6 bg-red-500 text-#555 rounded-md hover:bg-red-600 transition-colors">
+        Cerrar Sesión
+      </button>
+      <button class="py-2 px-6 bg-blue-500 text-#555 rounded-md hover:bg-blue-600 transition-colors">
+        Buscar Películas
+      </button>
+      <button *ngIf="isAdmin" class="py-2 px-6 bg-green-500 text-#555 rounded-md hover:bg-green-600 transition-colors">
+        Gestionar Usuarios
+      </button>
+    </div>
+  </div>
+</div>
