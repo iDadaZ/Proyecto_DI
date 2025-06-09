@@ -10,6 +10,7 @@ import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { LoginComponent } from './auth/login/login.component';
 import { MenuComponent } from './components/menu/menu.component';
 import { AuthInterceptor } from './auth/auth.interceptor';
+import { GestionUsuariosComponent } from './pages/gestion-usuarios/gestion-usuarios.components';
 
 
 
@@ -18,7 +19,8 @@ import { AuthInterceptor } from './auth/auth.interceptor';
   declarations: [
     AppComponent,
     LoginComponent,
-    MenuComponent
+    MenuComponent,
+    GestionUsuariosComponent
   ],
   imports: [
     BrowserModule,
@@ -27,7 +29,7 @@ import { AuthInterceptor } from './auth/auth.interceptor';
     NavbarComponent,
     ScrollToTopComponent,
     ReactiveFormsModule,
-    FormsModule
+    FormsModule,
   ],
   providers: [{
       provide: HTTP_INTERCEPTORS,

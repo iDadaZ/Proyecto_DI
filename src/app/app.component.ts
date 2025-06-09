@@ -19,7 +19,7 @@ export class AppComponent implements OnInit {
     ).subscribe((event: NavigationEnd) => {
       // Si la ruta actual es /login, ocultamos la barra y el footer
       // De lo contrario, los mostramos
-      this.showNavbarAndFooter = !(event.url === '/login' || event.url === '/menu');
+      this.showNavbarAndFooter = !(event.url === '/login' || event.url === '/menu' || event.url === '/gestion-usuarios');
 
     });
   }

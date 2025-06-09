@@ -13,7 +13,7 @@ export class MenuComponent implements OnInit {
   tmdbApiKey: string | null = null;
   tmdbAccountId: string | null = null;
 
-  constructor(private authService: AuthService, private router: Router) { }
+  constructor(private authService: AuthService, public router: Router) { }
 
   ngOnInit(): void {
     this.authService.currentUser.subscribe(user => {

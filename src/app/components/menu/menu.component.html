@@ -21,10 +21,12 @@
       <button (click)="logout()" class="py-2 px-6 bg-red-500 text-#555 rounded-md hover:bg-red-600 transition-colors">
         Cerrar Sesión
       </button>
-      <button class="py-2 px-6 bg-blue-500 text-#555 rounded-md hover:bg-blue-600 transition-colors">
+       <button (click)="router.navigate(['/buscar'])" class="py-2 px-6 bg-blue-500 text-#555 rounded-md hover:bg-blue-600 transition-colors">
         Buscar Películas
       </button>
-      <button *ngIf="isAdmin" class="py-2 px-6 bg-green-500 text-#555 rounded-md hover:bg-green-600 transition-colors">
+
+      <!-- ¡AÑADIDO EL EVENTO (click) PARA NAVEGAR! -->
+      <button *ngIf="isAdmin" (click)="router.navigate(['/gestion-usuarios'])" class="py-2 px-6 bg-green-500 text-#555 rounded-md hover:bg-green-700 transition-colors">
         Gestionar Usuarios
       </button>
     </div>

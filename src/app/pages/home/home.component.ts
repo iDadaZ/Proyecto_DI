@@ -21,54 +21,38 @@ export class HomeComponent implements OnInit {
 onScroll(){
 
   const pos = (document.documentElement.scrollTop || document.body.scrollTop) + 1000;
-
   const max = (document.documentElement.scrollHeight || document.body.scrollHeight);
 
   if (pos > max) {
-
   this.loadMoreMovies();
-    
+
   }
-
-
 }
 
   constructor(private peliculasSvc:PeliculasService){
-
     this.peliculasSvc.resetPeliculaPage();
-
   }
 
   ngOnInit(): void {
-    
     this.loadMovies();
-    
- 
   }
 
-
   loadMovies(){
-
     this.peliculasSvc.getCartelera().subscribe(res=>{
        this.movies = res;
        this.updateLoadedMovieIds();
-
     })
-
   }
 
   loadMoreMovies(){
-   
     this.peliculasSvc.getCartelera().subscribe(res=>{
       const newMovies = res.filter(movie=>!this.loadedMoviesIds.has(movie.id));
       this.movies.push(...newMovies);
       this.updateLoadedMovieIds();
     })
-    
   }
 
   updateLoadedMovieIds(){
     this.movies.forEach(movie=>this.loadedMoviesIds.add(movie.id));
   }
-
 }

@@ -8,14 +8,10 @@ import { Router } from '@angular/router';
   providedIn: 'root'
 })
 export class AuthService {
-
   private apiUrl = 'http://79.72.60.13/app.radfpd.es/api/peliculasApp/index.php';
 
   private loggedIn = new BehaviorSubject<boolean>(this.hasToken());
-
   currentUser = new BehaviorSubject<any>(this.getUserFromLocalStorage());
-
-
   isAdmin = new BehaviorSubject<boolean>(this.checkAdminRole());
 
   constructor(private http: HttpClient, private router: Router) {
@@ -26,28 +22,30 @@ export class AuthService {
   }
 
   private hasToken(): boolean {
-    return !!localStorage.getItem('jwt_token');
+    const has = !!localStorage.getItem('jwt_token');
+    console.log('AuthService: hasToken() -> Token presente en localStorage:', has); // LOG DE DEPURACIÓN
+    return has;
   }
 
   private getUserFromLocalStorage(): any | null {
     const token = localStorage.getItem('jwt_token');
+    console.log('AuthService: Token desde localStorage (getUserFromLocalStorage):', token ? 'Presente' : 'Ausente', 'Longitud:', token ? token.length : 0); // LOG DE DEPURACIÓN
     if (token) {
       try {
-
         const parts = token.split('.');
         if (parts.length === 3) {
-
           const payload = JSON.parse(atob(parts[1]));
+          console.log('AuthService: Payload decodificado del token (getUserFromLocalStorage):', payload); // LOG DE DEPURACIÓN
 
           if (payload.exp && (payload.exp * 1000 < Date.now())) {
-            console.warn('El token JWT ha expirado. Cerrando sesión automáticamente.');
+            console.warn('AuthService: El token JWT ha expirado en el frontend. Cerrando sesión automáticamente.');
             this.logout();
             return null;
           }
           return payload;
         }
       } catch (e) {
-        console.error('Error decodificando o verificando token JWT del localStorage:', e);
+        console.error('AuthService: Error decodificando o verificando token JWT del localStorage (getUserFromLocalStorage):', e);
         this.logout();
         return null;
       }
@@ -59,8 +57,8 @@ export class AuthService {
     const user = this.getUserFromLocalStorage();
     this.currentUser.next(user);
     this.isAdmin.next(user && user.role === 'admin');
+    console.log('AuthService: Usuario y rol actualizados (updateUserAndRole). Admin:', this.isAdmin.getValue()); // LOG DE DEPURACIÓN
   }
-
 
   private checkAdminRole(): boolean {
     const user = this.getUserFromLocalStorage();
@@ -68,36 +66,39 @@ export class AuthService {
   }
 
   checkEmail(email: string): Observable<any> {
+    console.log('AuthService: checkEmail para:', email); // LOG DE DEPURACIÓN
     return this.http.post<any>(`${this.apiUrl}?action=checkEmail`, { email }).pipe(
       delay(500),
       tap(response => {
         if (!response.ok) {
-          console.error('Error al verificar email en backend:', response.message);
+          console.error('AuthService: Error al verificar email en backend:', response.message);
+        } else {
+          console.log('AuthService: checkEmail exitoso. Respuesta:', response); // LOG DE DEPURACIÓN
         }
       }),
       catchError(error => {
-        console.error('Error en la petición checkEmail (HTTP):', error);
+        console.error('AuthService: Error en la petición checkEmail (HTTP):', error);
         return of({ ok: false, message: error.error?.message || 'Error de conexión con el servidor.', data: null });
       })
     );
   }
 
-  // Método público para iniciar sesión
   login(email: string, password: string): Observable<any> {
+    console.log('AuthService: Intentando login para:', email); // LOG DE DEPURACIÓN
     return this.http.post<any>(`${this.apiUrl}?action=login`, { email, password }).pipe(
       tap(response => {
         if (response.ok && response.data?.token) {
           localStorage.setItem('jwt_token', response.data.token);
           this.loggedIn.next(true);
           this.updateUserAndRole();
-          console.log('Login exitoso. Token JWT guardado y estado actualizado.');
+          console.log('AuthService: Login exitoso. Token JWT guardado en localStorage y estado actualizado.'); // LOG DE DEPURACIÓN
           this.router.navigate(['/menu']);
         } else {
-          console.error('Fallo en el login:', response.message);
+          console.error('AuthService: Fallo en el login:', response.message); // LOG DE DEPURACIÓN
         }
       }),
       catchError(error => {
-        console.error('Error en la petición login (HTTP):', error);
+        console.error('AuthService: Error en la petición login (HTTP):', error); // LOG DE DEPURACIÓN
         let errorMessage = 'Ocurrió un error inesperado al intentar iniciar sesión.';
         if (error.status === 401) {
           errorMessage = 'Credenciales incorrectas. Por favor, verifica tu email y contraseña.';
@@ -111,40 +112,37 @@ export class AuthService {
     );
   }
 
-  // Método público para cerrar la sesión del usuario.
   logout(): void {
-    localStorage.removeItem('jwt_token'); // Elimina el token del almacenamiento local
-    this.loggedIn.next(false); // Actualiza el estado de login a false
-    this.currentUser.next(null); // Borra la información del usuario actual
-    this.isAdmin.next(false); // Establece el rol de administrador a false
-    this.router.navigate(['/login']); // Redirige al usuario a la página de login
-    console.log('Sesión cerrada correctamente.');
+    console.log('AuthService: Ejecutando logout.'); // LOG DE DEPURACIÓN
+    localStorage.removeItem('jwt_token');
+    this.loggedIn.next(false);
+    this.currentUser.next(null);
+    this.isAdmin.next(false);
+    this.router.navigate(['/login']);
+    console.log('AuthService: Sesión cerrada correctamente.'); // LOG DE DEPURACIÓN
   }
 
-  // Para saber si esta logueado
   isLoggedIn(): Observable<boolean> {
     return this.loggedIn.asObservable();
   }
 
-  // Para que los componentes puedan saber si el usuario es administrador.
   isUserAdmin(): Observable<boolean> {
     return this.isAdmin.asObservable();
   }
 
-  // Devuelve la clave API para el usuario actual desde el token.
   getTmdbApiKey(): string | null {
     const user = this.currentUser.getValue();
     return user ? user.api_movies : null;
   }
 
-  // Devuelve el ID para el usuario actual desde el token.
   getTmdbAccountId(): string | null {
     const user = this.currentUser.getValue();
     return user ? user.account_id : null;
   }
 
-  // obtener el token JWT actual
   getToken(): string | null {
-    return localStorage.getItem('jwt_token');
+    const token = localStorage.getItem('jwt_token');
+    console.log('AuthService: getToken() llamado. Token retornado:', token ? 'Presente' : 'Ausente. Longitud:', token ? token.length : 0); // LOG DE DEPURACIÓN CRÍTICO
+    return token;
   }
 }

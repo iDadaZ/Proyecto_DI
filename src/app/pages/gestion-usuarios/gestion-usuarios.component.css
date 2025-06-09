@@ -1,0 +1,190 @@
+/* src/app/pages/gestion-usuarios/gestion-usuarios.component.css */
+
+/* Estilos para el input de tipo Cisco-like (reutilizado) */
+.cisco-input {
+  border: none;
+  border-bottom: 2px solid #ccc;
+  padding: 8px 0;
+  font-size: 1.1rem;
+  color: #333;
+  transition: border-color 0.3s ease;
+}
+
+.cisco-input:focus {
+  border-color: #007bff;
+  outline: none;
+  box-shadow: none;
+}
+
+/* Estilos para la tabla */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  text-align: left;
+  padding: 12px 15px;
+  border-bottom: 1px solid #e2e8f0; /* gray-200 de Tailwind */
+}
+
+th {
+  background-color: #3182ce; /* blue-700 de Tailwind, pero para el encabezado */
+  color: white;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.875rem; /* text-sm de Tailwind */
+  letter-spacing: 0.05em; /* tracking-wider de Tailwind */
+}
+
+/* Filas pares/impares y hover */
+tbody tr:nth-child(odd) {
+  background-color: #f7fafc; /* gray-50 de Tailwind */
+}
+
+tbody tr:nth-child(even) {
+  background-color: #ffffff; /* bg-white de Tailwind */
+}
+
+tbody tr:hover {
+  background-color: #edf2f7; /* gray-100 de Tailwind */
+}
+
+/* Estilos para los iconos de acción (SVG) */
+.text-blue-600 { color: #2b6cb0; } /* blue-600 de Tailwind */
+.hover\:text-blue-900:hover { color: #2c5282; } /* blue-900 de Tailwind */
+.text-red-600 { color: #e53e3e; } /* red-600 de Tailwind */
+.hover\:text-red-900:hover { color: #c53030; } /* red-900 de Tailwind */
+
+.mr-3 { margin-right: 0.75rem; }
+
+/* Estilos para el Toggle Switch (similar a un iOS toggle) */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 40px; /* Ancho del switch */
+  height: 24px; /* Alto del switch */
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc; /* Color cuando está deshabilitado */
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px; /* Alto del "pulgar" */
+  width: 16px; /* Ancho del "pulgar" */
+  left: 4px; /* Posición inicial */
+  bottom: 4px; /* Posición inicial */
+  background-color: white;
+  -webkit-transition: .4s;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #4CAF50; /* Color cuando está habilitado (verde) */
+}
+
+input:focus + .slider {
+  box-shadow: 0 0 1px #4CAF50;
+}
+
+input:checked + .slider:before {
+  -webkit-transform: translateX(16px); /* Mueve el pulgar a la derecha */
+  -ms-transform: translateX(16px);
+  transform: translateX(16px);
+}
+
+/* Bordes redondeados para el slider (para que parezca una píldora) */
+.slider.round {
+  border-radius: 24px; /* Mitad del alto para que sea una píldora */
+}
+
+.slider.round:before {
+  border-radius: 50%; /* Hace el pulgar redondo */
+}
+
+/* Estilos de spinner (reutilizados de componentes anteriores) */
+.spinner {
+  border: 4px solid rgba(255, 255, 255, 0.3);
+  border-top: 4px solid #fff;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+.spinner-large {
+  border: 6px solid rgba(0, 0, 0, 0.1);
+  border-top: 6px solid #007bff; /* Color primario de Cisco-like */
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Estilos para el modal */
+.fixed.inset-0 {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.bg-gray-600.bg-opacity-50 {
+  background-color: rgba(75, 85, 99, 0.5); /* gray-600 con 50% de opacidad */
+}
+
+.overflow-y-auto { overflow-y: auto; }
+.h-full { height: 100%; }
+.w-full { width: 100%; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.z-50 { z-index: 50; } /* Para que el modal esté por encima de todo */
+
+.bg-white { background-color: #fff; }
+.p-8 { padding: 2rem; }
+.rounded-lg { border-radius: 0.5rem; }
+.shadow-xl { box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+.max-w-md { max-width: 28rem; } /* Ancho máximo para el modal */
+.mx-auto { margin-left: auto; margin-right: auto; }
+
+/* Estilos para los botones del modal */
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+.bg-gray-300 { background-color: #d1d5db; }
+.text-gray-800 { color: #1f2937; }
+.hover\:bg-gray-400:hover { background-color: #9ca3af; }
+.bg-green-600 { background-color: #059669; }
+.text-white { color: #fff; }
+.hover\:bg-green-700:hover { background-color: #047857; }
+.transition-colors { transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+.space-x-4 > * + * { margin-left: 1rem; }
+
+/* Otros estilos globales como font-inter */
+.font-inter {
+  font-family: 'Inter', sans-serif;
+}
