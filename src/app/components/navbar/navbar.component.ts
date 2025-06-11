@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { TmdbService } from '../../services/tmdb.service';
 
 @Component({
   selector: 'app-navbar',
@@ -10,25 +11,21 @@ import { Router, RouterLink } from '@angular/router';
   styleUrl: './navbar.component.css'
 })
 export class NavbarComponent implements OnInit {
-  
-  constructor(private router:Router){}
-  
-  
+
+  constructor(private router: Router, private tmdbService: TmdbService) { }
+
+
   ngOnInit(): void {
-    
+
   }
 
-  buscarPelicula(texto:string){
-
+  buscarPelicula(texto: string) {
     texto = texto.trim();
     if (texto.length === 0) {
-
       return;
-      
     }
 
     this.router.navigate(['/buscar', texto]);
-
   }
 
 }

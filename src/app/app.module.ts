@@ -11,6 +11,7 @@ import { LoginComponent } from './auth/login/login.component';
 import { MenuComponent } from './components/menu/menu.component';
 import { AuthInterceptor } from './auth/auth.interceptor';
 import { GestionUsuariosComponent } from './pages/gestion-usuarios/gestion-usuarios.components';
+import { TmdbSessionIdComponent } from './components/tmdb-session-id/tmdb-session-id.component';
 
 
 
@@ -20,7 +21,8 @@ import { GestionUsuariosComponent } from './pages/gestion-usuarios/gestion-usuar
     AppComponent,
     LoginComponent,
     MenuComponent,
-    GestionUsuariosComponent
+    GestionUsuariosComponent,
+    TmdbSessionIdComponent
   ],
   imports: [
     BrowserModule,

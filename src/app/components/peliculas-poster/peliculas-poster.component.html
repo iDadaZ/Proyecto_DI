@@ -1,31 +1,30 @@
-<div class="row" >
-
+<div class="row">
     <div class="col-md-3 mb-5" *ngFor="let movie of movies">
-
-        <img [src]="movie.poster_path | poster" class="img-thumbnail img-fluid cursor" (click)="onMovieCLick(movie)">
-
+        <img [src]="movie.poster_path | poster"
+             class="img-thumbnail img-fluid cursor"
+             (click)="onMovieClick(movie)"
+             [alt]="movie.title">
         <div>
             <h3 class="mt-2">{{movie.title}}</h3>
             <div class="row align-items-center">
                 <div class="col-10 text-white">
                     <div *ngIf="movie.vote_average">
-
                         <div class="stars-container">
-                     
                             <i *ngFor="let star of getStars(movie.vote_average)" class="fas fa-star"></i>
-        
-                         </div>
-
+                        </div>
                     </div>
-                    
                 </div>
-            <div class="col-2 text-white">
-                    {{movie.vote_average | number:'1.1-2'}}
-            </div>    
+                <div class="col-2 text-white d-flex align-items-center justify-content-end">
+                    <span class="me-2">{{movie.vote_average | number:'1.1-2'}}</span>
 
+                    <i *ngIf="isLoggedIn | async"
+                       (click)="onToggleFavorite(movie, $event)"
+                       class="fas fa-heart cursor favorite-icon"
+                       [class.is-favorite]="(isFavorite(movie) | async)"
+                       [class.not-favorite]="!(isFavorite(movie) | async)">
+                    </i>
+                </div>
             </div>
         </div>
-
     </div>
-
 </div>

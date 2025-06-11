@@ -1,148 +1,208 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, of } from 'rxjs';
-import { tap, catchError, delay } from 'rxjs/operators';
 import { Router } from '@angular/router';
+import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
+import { User } from '../interfaces/usuario.interface';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { tap, catchError, map } from 'rxjs/operators';
+
+// Nueva interfaz para la respuesta completa del backend de check-email
+interface CheckEmailBackendResponse {
+  ok: boolean;
+  message?: string;
+  data: {
+    email_exists: boolean;
+    is_enabled: boolean;
+  };
+  permises: any; // O el tipo correcto si conoces la estructura de 'permises'
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://79.72.60.13/app.radfpd.es/api/peliculasApp/index.php';
+  private readonly USER_KEY = 'currentUser';
+  private readonly JWT_TOKEN = 'jwtToken';
+  private readonly API_MOVIES_KEY = 'apiMoviesKey';
+  private readonly ACCOUNT_ID_KEY = 'accountId';
+  private readonly TMDB_SESSION_ID_KEY = 'tmdbSessionId';
+  private readonly PENDING_TMDB_REQUEST_TOKEN = 'pendingTmdbRequestToken';
 
-  private loggedIn = new BehaviorSubject<boolean>(this.hasToken());
-  currentUser = new BehaviorSubject<any>(this.getUserFromLocalStorage());
-  isAdmin = new BehaviorSubject<boolean>(this.checkAdminRole());
+  private userSubject: BehaviorSubject<User | null>;
+  public currentUser: Observable<User | null>;
 
-  constructor(private http: HttpClient, private router: Router) {
-    if (this.hasToken()) {
-      this.loggedIn.next(true);
-      this.updateUserAndRole();
+  // Asegúrate de que esta URL sea correcta. Si 'index.php' no es necesario, quítalo.
+  // Basado en tu URL anterior: http://79.72.60.13/app.radfpd.es/api/peliculasApp
+  private apiUrl = 'http://79.72.60.13/app.radfpd.es/api/peliculasApp'; // Eliminado /index.php si los endpoints están directamente bajo /api/peliculasApp
+
+  constructor(private router: Router, private http: HttpClient) {
+    const storedUser = localStorage.getItem(this.USER_KEY);
+    this.userSubject = new BehaviorSubject<User | null>(storedUser ? JSON.parse(storedUser) : null);
+    this.currentUser = this.userSubject.asObservable();
+  }
+
+  public get currentUserValue(): User | null {
+    return this.userSubject.value;
+  }
+
+  private decodeJwtTokenPayload(token: string): any {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      console.error('Error decoding JWT token:', e);
+      return null;
     }
   }
 
-  private hasToken(): boolean {
-    const has = !!localStorage.getItem('jwt_token');
-    console.log('AuthService: hasToken() -> Token presente en localStorage:', has); // LOG DE DEPURACIÓN
-    return has;
-  }
-
-  private getUserFromLocalStorage(): any | null {
-    const token = localStorage.getItem('jwt_token');
-    console.log('AuthService: Token desde localStorage (getUserFromLocalStorage):', token ? 'Presente' : 'Ausente', 'Longitud:', token ? token.length : 0); // LOG DE DEPURACIÓN
-    if (token) {
-      try {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          console.log('AuthService: Payload decodificado del token (getUserFromLocalStorage):', payload); // LOG DE DEPURACIÓN
-
-          if (payload.exp && (payload.exp * 1000 < Date.now())) {
-            console.warn('AuthService: El token JWT ha expirado en el frontend. Cerrando sesión automáticamente.');
-            this.logout();
-            return null;
-          }
-          return payload;
-        }
-      } catch (e) {
-        console.error('AuthService: Error decodificando o verificando token JWT del localStorage (getUserFromLocalStorage):', e);
-        this.logout();
-        return null;
-      }
-    }
-    return null;
-  }
-
-  private updateUserAndRole(): void {
-    const user = this.getUserFromLocalStorage();
-    this.currentUser.next(user);
-    this.isAdmin.next(user && user.role === 'admin');
-    console.log('AuthService: Usuario y rol actualizados (updateUserAndRole). Admin:', this.isAdmin.getValue()); // LOG DE DEPURACIÓN
-  }
-
-  private checkAdminRole(): boolean {
-    const user = this.getUserFromLocalStorage();
-    return user && user.role === 'admin';
-  }
-
-  checkEmail(email: string): Observable<any> {
-    console.log('AuthService: checkEmail para:', email); // LOG DE DEPURACIÓN
-    return this.http.post<any>(`${this.apiUrl}?action=checkEmail`, { email }).pipe(
-      delay(500),
+  login(email: string, password: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/login`, { email, password }).pipe(
       tap(response => {
-        if (!response.ok) {
-          console.error('AuthService: Error al verificar email en backend:', response.message);
+        if (response && response.data && response.data.token) {
+          const decodedToken = this.decodeJwtTokenPayload(response.data.token);
+          if (decodedToken) {
+            const user: User = {
+              id_usuario: decodedToken.id_usuario,
+              email: decodedToken.email,
+              role: decodedToken.role || 'user',
+              is_enabled: decodedToken.is_enabled || true,
+              api_movies: localStorage.getItem(this.API_MOVIES_KEY) || '',
+              account_id: localStorage.getItem(this.ACCOUNT_ID_KEY) || ''
+            };
+            localStorage.setItem(this.USER_KEY, JSON.stringify(user));
+            localStorage.setItem(this.JWT_TOKEN, response.data.token);
+            this.userSubject.next(user);
+            this.router.navigate(['/menu']); // REDIRECCIÓN AL MENÚ
+            console.log('Login exitoso. Token guardado y redirigiendo a /menu.');
+          } else {
+            console.error('AuthService: Login exitoso pero el token JWT no se pudo decodificar. Respuesta:', response);
+            throw new Error('No se pudo decodificar el token de la respuesta de login.');
+          }
         } else {
-          console.log('AuthService: checkEmail exitoso. Respuesta:', response); // LOG DE DEPURACIÓN
+          console.error('AuthService: Login exitoso pero no se encontró el token en response.data.token. Respuesta:', response);
+          throw new Error('No se pudo obtener el token de la respuesta de login.');
         }
       }),
-      catchError(error => {
-        console.error('AuthService: Error en la petición checkEmail (HTTP):', error);
-        return of({ ok: false, message: error.error?.message || 'Error de conexión con el servidor.', data: null });
+      catchError((error: HttpErrorResponse | Error) => {
+        console.error('Login failed:', error);
+        let errorMessage = 'Error al iniciar sesión. Verifica tus credenciales.';
+
+        if (error instanceof HttpErrorResponse) {
+          if (error.status === 401) {
+            errorMessage = 'Credenciales incorrectas. Vuelve a intentarlo.';
+          } else if (error.error && error.error.message) {
+            errorMessage = error.error.message;
+          }
+        } else if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+
+        return throwError(() => new Error(errorMessage));
       })
     );
   }
 
-  login(email: string, password: string): Observable<any> {
-    console.log('AuthService: Intentando login para:', email); // LOG DE DEPURACIÓN
-    return this.http.post<any>(`${this.apiUrl}?action=login`, { email, password }).pipe(
-      tap(response => {
-        if (response.ok && response.data?.token) {
-          localStorage.setItem('jwt_token', response.data.token);
-          this.loggedIn.next(true);
-          this.updateUserAndRole();
-          console.log('AuthService: Login exitoso. Token JWT guardado en localStorage y estado actualizado.'); // LOG DE DEPURACIÓN
-          this.router.navigate(['/menu']);
-        } else {
-          console.error('AuthService: Fallo en el login:', response.message); // LOG DE DEPURACIÓN
-        }
-      }),
-      catchError(error => {
-        console.error('AuthService: Error en la petición login (HTTP):', error); // LOG DE DEPURACIÓN
-        let errorMessage = 'Ocurrió un error inesperado al intentar iniciar sesión.';
-        if (error.status === 401) {
-          errorMessage = 'Credenciales incorrectas. Por favor, verifica tu email y contraseña.';
-        } else if (error.status === 403) {
-          errorMessage = 'Tu cuenta está deshabilitada. Contacta con el administrador.';
-        } else if (error.error?.message) {
-          errorMessage = error.error.message;
-        }
-        return of({ ok: false, message: errorMessage, data: null });
+  /**
+   * Verifica si un email está registrado en el sistema Y habilitado
+   * mediante una llamada real al backend.
+   * Ahora devuelve la estructura completa que el backend envía.
+   * @param email El email a verificar.
+   * @returns Un Observable que emite la estructura completa de CheckEmailBackendResponse.
+   */
+  checkEmail(email: string): Observable<CheckEmailBackendResponse> {
+    // CAMBIO CLAVE AQUÍ: El tipo de retorno de http.post ahora es CheckEmailBackendResponse
+    return this.http.post<CheckEmailBackendResponse>(`${this.apiUrl}/check-email`, { email }).pipe(
+      tap(response => console.log('AuthService: Respuesta del backend a check-email:', response)), // Añadido para depuración
+      catchError((error: HttpErrorResponse) => {
+        console.error('Error al verificar el email con el backend:', error);
+        // Si hay un error HTTP, lanzamos un error que el componente puede manejar.
+        // El componente decidirá si mostrar un mensaje de error o no.
+        const errorMessage = error.error?.message || 'Error de comunicación con el servidor. Inténtalo de nuevo.';
+        return throwError(() => new Error(errorMessage)); // Lanzar el error para que el componente lo capture
       })
     );
   }
 
   logout(): void {
-    console.log('AuthService: Ejecutando logout.'); // LOG DE DEPURACIÓN
-    localStorage.removeItem('jwt_token');
-    this.loggedIn.next(false);
-    this.currentUser.next(null);
-    this.isAdmin.next(false);
+    localStorage.removeItem(this.USER_KEY);
+    localStorage.removeItem(this.JWT_TOKEN);
+    localStorage.removeItem(this.API_MOVIES_KEY);
+    localStorage.removeItem(this.ACCOUNT_ID_KEY);
+    localStorage.removeItem(this.TMDB_SESSION_ID_KEY);
+    localStorage.removeItem(this.PENDING_TMDB_REQUEST_TOKEN);
+    this.userSubject.next(null);
     this.router.navigate(['/login']);
-    console.log('AuthService: Sesión cerrada correctamente.'); // LOG DE DEPURACIÓN
   }
 
   isLoggedIn(): Observable<boolean> {
-    return this.loggedIn.asObservable();
-  }
-
-  isUserAdmin(): Observable<boolean> {
-    return this.isAdmin.asObservable();
-  }
-
-  getTmdbApiKey(): string | null {
-    const user = this.currentUser.getValue();
-    return user ? user.api_movies : null;
-  }
-
-  getTmdbAccountId(): string | null {
-    const user = this.currentUser.getValue();
-    return user ? user.account_id : null;
+    return this.userSubject.asObservable().pipe(
+      map(user => user !== null)
+    );
   }
 
   getToken(): string | null {
-    const token = localStorage.getItem('jwt_token');
-    console.log('AuthService: getToken() llamado. Token retornado:', token ? 'Presente' : 'Ausente. Longitud:', token ? token.length : 0); // LOG DE DEPURACIÓN CRÍTICO
-    return token;
+    return localStorage.getItem(this.JWT_TOKEN);
+  }
+
+  hasRole(role: 'admin' | 'user'): boolean {
+    const user = this.currentUserValue;
+    return user !== null && user.role === role;
+  }
+
+  isUserAdmin(): Observable<boolean> {
+    const user = this.currentUserValue;
+    if (user && user.role === 'admin') {
+      return of(true);
+    }
+    return of(false);
+  }
+
+  saveTmdbApiKey(apiKey: string): void {
+    localStorage.setItem(this.API_MOVIES_KEY, apiKey);
+    const user = this.currentUserValue;
+    if (user) {
+      const updatedUser: User = { ...user, api_movies: apiKey };
+      localStorage.setItem(this.USER_KEY, JSON.stringify(updatedUser));
+      this.userSubject.next(updatedUser);
+    }
+  }
+
+  getTmdbApiKey(): string | null {
+    return localStorage.getItem(this.API_MOVIES_KEY);
+  }
+
+  saveTmdbSessionDetails(sessionId: string, accountId: string): void {
+    localStorage.setItem(this.TMDB_SESSION_ID_KEY, sessionId);
+    localStorage.setItem(this.ACCOUNT_ID_KEY, accountId);
+
+    const user = this.currentUserValue;
+    if (user) {
+      const updatedUser: User = { ...user, account_id: accountId };
+      localStorage.setItem(this.USER_KEY, JSON.stringify(updatedUser));
+      this.userSubject.next(updatedUser);
+    }
+  }
+
+  getTmdbSessionId(): string | null {
+    return localStorage.getItem(this.TMDB_SESSION_ID_KEY);
+  }
+
+  getTmdbAccountId(): string | null {
+    return localStorage.getItem(this.ACCOUNT_ID_KEY);
+  }
+
+  setPendingTmdbRequestToken(requestToken: string): void {
+    localStorage.setItem(this.PENDING_TMDB_REQUEST_TOKEN, requestToken);
+  }
+
+  getPendingTmdbRequestToken(): string | null {
+    return localStorage.getItem(this.PENDING_TMDB_REQUEST_TOKEN);
+  }
+
+  clearPendingTmdbRequestToken(): void {
+    localStorage.removeItem(this.PENDING_TMDB_REQUEST_TOKEN);
   }
 }
