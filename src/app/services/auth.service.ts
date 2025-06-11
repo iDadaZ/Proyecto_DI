@@ -30,9 +30,7 @@ export class AuthService {
   private userSubject: BehaviorSubject<User | null>;
   public currentUser: Observable<User | null>;
 
-  // Asegúrate de que esta URL sea correcta. Si 'index.php' no es necesario, quítalo.
-  // Basado en tu URL anterior: http://79.72.60.13/app.radfpd.es/api/peliculasApp
-  private apiUrl = 'http://79.72.60.13/app.radfpd.es/api/peliculasApp'; // Eliminado /index.php si los endpoints están directamente bajo /api/peliculasApp
+  private apiUrl = 'http://79.72.60.13/app.radfpd.es/api/peliculasApp/index.php';
 
   constructor(private router: Router, private http: HttpClient) {
     const storedUser = localStorage.getItem(this.USER_KEY);
@@ -69,9 +67,12 @@ export class AuthService {
               email: decodedToken.email,
               role: decodedToken.role || 'user',
               is_enabled: decodedToken.is_enabled || true,
-              api_movies: localStorage.getItem(this.API_MOVIES_KEY) || '',
-              account_id: localStorage.getItem(this.ACCOUNT_ID_KEY) || ''
+              api_movies: decodedToken.api_movies || '',
+              account_id: decodedToken.account_id || ''
             };
+            localStorage.setItem(this.API_MOVIES_KEY, decodedToken.api_movies || '');
+            localStorage.setItem(this.ACCOUNT_ID_KEY, decodedToken.account_id || '');
+
             localStorage.setItem(this.USER_KEY, JSON.stringify(user));
             localStorage.setItem(this.JWT_TOKEN, response.data.token);
             this.userSubject.next(user);
@@ -105,13 +106,7 @@ export class AuthService {
     );
   }
 
-  /**
-   * Verifica si un email está registrado en el sistema Y habilitado
-   * mediante una llamada real al backend.
-   * Ahora devuelve la estructura completa que el backend envía.
-   * @param email El email a verificar.
-   * @returns Un Observable que emite la estructura completa de CheckEmailBackendResponse.
-   */
+
   checkEmail(email: string): Observable<CheckEmailBackendResponse> {
     // CAMBIO CLAVE AQUÍ: El tipo de retorno de http.post ahora es CheckEmailBackendResponse
     return this.http.post<CheckEmailBackendResponse>(`${this.apiUrl}/check-email`, { email }).pipe(

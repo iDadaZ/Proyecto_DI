@@ -12,10 +12,17 @@
       Tu rol es de Usuario.
     </p>
 
-    <div class="text-sm text-gray-500 mt-4">
-      <p>TMDB API Key: {{ tmdbApiKey || 'N/A' }}</p>
-      <p>TMDB Account ID: {{ tmdbAccountId || 'N/A' }}</p>
-    </div>
+    <div class="text-sm text-gray-700 mt-4 p-2 bg-gray-200 rounded-md max-w-lg mx-auto break-words">
+      <!---->
+  <p class="mb-1">
+    <span class="font-semibold">TMDB API Key:</span>
+    <span class="block text-gray-800 text-xs break-all leading-tight mt-1">{{ tmdbApiKey || 'N/A' }}</span>
+  </p>
+  <p>
+    <span class="font-semibold">TMDB Account ID:</span>
+    <span class="block text-gray-800 text-xs break-all leading-tight mt-1">{{ tmdbAccountId || 'N/A' }}</span>
+  </p>
+</div>
 
     <div class="mt-6 flex justify-center space-x-4">
       <button (click)="logout()" class="py-2 px-6 bg-red-500 text-#555 rounded-md hover:bg-red-600 transition-colors">
@@ -29,7 +36,7 @@
         Gestionar Usuarios
       </button>
 
-      <button *ngIf="!tmdbAccountId" (click)="openTmdbAuthModal()" class="py-2 px-6 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors">
+      <button *ngIf="!tmdbAccountId" (click)="openTmdbAuthModal()" class="py-2 px-6 bg-purple-500 text-#555 rounded-md hover:bg-purple-600 transition-colors">
         Conectar Cuenta TMDB
       </button>
       <button *ngIf="tmdbAccountId" disabled class="py-2 px-6 bg-gray-400 text-white rounded-md cursor-not-allowed">
