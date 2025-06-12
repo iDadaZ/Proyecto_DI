@@ -4,8 +4,9 @@ export interface User {
   password?: string;
   role: 'admin' | 'user';
   is_enabled: boolean;
-  api_movies: string;
-  account_id: string;
+  api_movies: string | null;
+  account_id: string | null;
+  tmdb_session_id?:string | null;
 }
 
 // Interfaz para la respuesta de la API al obtener usuarios

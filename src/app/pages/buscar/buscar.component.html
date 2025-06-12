@@ -1,9 +1,127 @@
-<h1 class="text-capitalize">Buscar Peliculas <small>{{texto}}</small></h1>
+<h1 class="text-capitalize">Buscar Películas <small *ngIf="texto">{{texto}}</small></h1>
 <hr>
-<div class="row">
-    <div class="col">
-        <app-peliculas-poster [movies]="movies" *ngIf="movies.length > 0"></app-peliculas-poster>
 
-        <h3 class="text-warning" *ngIf="noMovie"><strong>{{noMovie}}</strong></h3>
+<div class="search-form-container">
+    <div class="form-group">
+        <label for="searchQuery">Título de la película:</label>
+        <input
+            type="text"
+            id="searchQuery"
+            class="form-control"
+            placeholder="Ej: Spiderman, Interstellar..."
+            [(ngModel)]="searchQuery"
+            (input)="onSearchInputChanged()"  >
+    </div>
+
+    <div class="advanced-filters mt-3">
+        <div class="form-group">
+            <label for="genreSelect">Género:</label>
+            <select id="genreSelect" class="form-control" [(ngModel)]="selectedGenre" (change)="onFilterChange()"> <option [ngValue]="null">Todos los géneros</option>
+                <option *ngFor="let genre of genres$ | async" [ngValue]="genre.id">{{ genre.name }}</option>
+            </select>
+        </div>
+
+        <div class="form-group mt-2">
+            <label for="favoriteFilter">Mostrar:</label>
+            <select id="favoriteFilter" class="form-control" [(ngModel)]="filterFavorites" (change)="onFilterChange()"> <option value="all">Todas las películas</option>
+                <option value="favorites">Solo mis favoritas</option>
+                <option value="not_favorites">Solo las que no son favoritas</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-actions mt-3">
+        <button class="btn btn-secondary" (click)="clearAllFilters()">Limpiar Filtros</button> </div>
+</div>
+
+<div *ngIf="loading" class="alert alert-info text-center mt-3">
+    Cargando películas...
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+</div>
+
+<div *ngIf="errorMessage" class="alert alert-danger text-center mt-3">
+    <h3><strong>¡Error!</strong> {{ errorMessage }}</h3>
+</div>
+
+<div *ngIf="!loading && noMovie" class="alert alert-warning text-center mt-3">
+    <h3><strong>{{noMovie}}</strong></h3>
+</div>
+
+<div *ngIf="!loading && movies.length > 0" class="results-summary mt-3 text-center">
+    <p>Mostrando {{ movies.length }} de {{ totalResults }} resultados.</p>
+</div>
+
+<div class="row mt-3" *ngIf="movies.length > 0">
+    <div class="col">
+        <app-peliculas-poster [movies]="movies" (toggleFavorite)="toggleFavorite($event.movieId, $event.isCurrentlyFavorite)"></app-peliculas-poster>
+    </div>
+</div>
+
+<div class="pagination-controls text-center mt-4" *ngIf="!loading && totalPages > 1">
+    <button class="btn btn-outline-primary" (click)="goToPage(currentPage - 1)" [disabled]="currentPage === 1">Anterior</button>
+    <span class="mx-3">Página {{ currentPage }} de {{ totalPages }}</span>
+    <button class="btn btn-outline-primary" (click)="goToPage(currentPage + 1)" [disabled]="currentPage === totalPages">Siguiente</button>
+</div>
+
+<div *ngIf="showDetailModal" class="modal-overlay">
+    <div class="modal-content">
+        <button class="close-button" (click)="closeMovieDetails()">&times;</button>
+        <div *ngIf="loading" class="text-center">Cargando detalles...</div>
+        <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+        <div *ngIf="selectedMovie && !loading">
+            <div class="modal-header">
+                <img [src]="peliculasSvc.getPosterUrl(selectedMovie.poster_path, 'w300')" alt="{{ selectedMovie.title }}" class="movie-poster-modal">
+                <div class="movie-info-header">
+                    <h2>{{ selectedMovie.title }} ({{ selectedMovie.release_date | date:'yyyy' }})</h2>
+                    <p class="tagline">{{ selectedMovie.tagline }}</p>
+                    <div class="rating">
+                        <i class="fa-solid fa-star"></i> {{ selectedMovie.vote_average | number:'1.1-1' }} / 10
+                    </div>
+                    <div class="actions">
+                        <button class="btn btn-favorite"
+                                [ngClass]="{'btn-success': selectedMovie.isFavorite, 'btn-outline-success': !selectedMovie.isFavorite}"
+                                (click)="toggleFavorite(selectedMovie.id, selectedMovie.isFavorite)">
+                            <i class="fa-solid fa-heart"></i> {{ selectedMovie.isFavorite ? 'En favoritos' : 'Añadir a favoritos' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-body">
+                <h3>Sinopsis</h3>
+                <p>{{ selectedMovie.overview }}</p>
+
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <strong>Duración:</strong> {{ selectedMovie.runtime }} min
+                    </div>
+                    <div class="detail-item">
+                        <strong>Géneros:</strong>
+                        <span *ngFor="let genre of selectedMovie.genres; last as isLast">
+                            {{ genre.name }}{{ !isLast ? ', ' : '' }}
+                        </span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>Presupuesto:</strong> {{ selectedMovie.budget | currency:'USD':'symbol':'1.0-0' }}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Recaudación:</strong> {{ selectedMovie.revenue | currency:'USD':'symbol':'1.0-0' }}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Idioma Original:</strong> {{ selectedMovie.original_language | uppercase }}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Popularidad:</strong> {{ selectedMovie.popularity | number:'1.0-0' }}
+                    </div>
+                </div>
+
+                <h3 class="mt-3">Imágenes</h3>
+                <div class="image-gallery">
+                    <img *ngFor="let image of selectedMovie.images" [src]="peliculasSvc.getPosterUrl(image.file_path, 'w500')" class="gallery-image" alt="Movie Image">
+                    <p *ngIf="!selectedMovie.images || selectedMovie.images.length === 0">No hay imágenes adicionales disponibles.</p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
