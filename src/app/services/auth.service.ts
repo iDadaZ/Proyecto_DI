@@ -115,7 +115,7 @@ export class AuthService {
             user.account_id = user.account_id || localStorage.getItem(this.TMDB_ACCOUNT_ID_KEY_LOCAL_STORAGE) || null; // V3 Key
             user.tmdb_session_id = user.tmdb_session_id || localStorage.getItem(this.TMDB_SESSION_ID_KEY_LOCAL_STORAGE) || null;
             user.tmdb_v4_read_access_token = user.tmdb_v4_read_access_token || localStorage.getItem(this.TMDB_V4_READ_ACCESS_TOKEN_LOCAL_STORAGE) || null;
-            user.tmdb_user_account_id = user.tmdb_user_account_id || localStorage.getItem(this.TMDB_USER_ACCOUNT_ID_LOCAL_STORAGE) || null; // NUEVO CAMPO
+            user.tmdb_user_account_id = localStorage.getItem(this.TMDB_USER_ACCOUNT_ID_LOCAL_STORAGE) || null;
 
             localStorage.setItem(this.JWT_TOKEN, response.data.token);
             localStorage.setItem(this.USER_KEY, JSON.stringify(user));

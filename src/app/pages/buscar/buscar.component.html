@@ -55,7 +55,7 @@
 
 <div class="row mt-3" *ngIf="movies.length > 0">
     <div class="col">
-        <app-peliculas-poster [movies]="movies" (toggleFavorite)="toggleFavorite($event.movieId, $event.isCurrentlyFavorite)"></app-peliculas-poster>
+        <app-peliculas-poster [movies]="movies" (movieToggleFavorite)="onMovieToggleFavoriteFromChild($event)"></app-peliculas-poster>
     </div>
 </div>
 
