@@ -14,12 +14,17 @@
 
     <div class="text-sm text-gray-700 mt-4 p-2 bg-gray-200 rounded-md max-w-lg mx-auto break-words">
       <p class="mb-1">
-        <span class="font-semibold">TMDB API Key:</span>
-        <span class="block text-gray-800 text-xs break-all leading-tight mt-1">{{ tmdbApiKey || 'N/A' }}</span>
+        <span class="font-semibold">TMDB API Key :</span>
+        <span class="block text-gray-800 text-xs break-all leading-tight mt-1">{{ tmdbV3ApiKey || 'N/A' }}</span>
+      </p>
+
+      <p class="mb-1">
+        <span class="font-semibold">TMDB Account ID (Real de TMDB):</span>
+        <span class="block text-gray-800 text-xs break-all leading-tight mt-1">{{ tmdbAccountIdReal || 'N/A' }}</span>
       </p>
       <p>
-        <span class="font-semibold">TMDB Account ID:</span>
-        <span class="block text-gray-800 text-xs break-all leading-tight mt-1">{{ tmdbAccountId || 'N/A' }}</span>
+        <span class="font-semibold">TMDB Session ID:</span>
+        <span class="block text-gray-800 text-xs break-all leading-tight mt-1">{{ tmdbSessionId || 'N/A' }}</span>
       </p>
     </div>
 
@@ -35,10 +40,10 @@
         Gestionar Usuarios
       </button>
 
-      <button *ngIf="!tmdbAccountId" (click)="openTmdbAuthModal()" class="py-2 px-6 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors">
+      <button *ngIf="!tmdbAccountIdReal || !tmdbSessionId" (click)="openTmdbAuthModal()" class="py-2 px-6 bg-purple-500 text-#555 rounded-md hover:bg-purple-600 transition-colors">
         Conectar Cuenta TMDB
       </button>
-      <button *ngIf="tmdbAccountId" disabled class="py-2 px-6 bg-gray-400 text-white rounded-md cursor-not-allowed">
+      <button *ngIf="tmdbAccountIdReal && tmdbSessionId" disabled class="py-2 px-6 bg-gray-400 text-white rounded-md cursor-not-allowed">
         TMDB Conectada
       </button>
     </div>
@@ -58,11 +63,10 @@
         <button (click)="startTmdbAuthFlow()" class="py-2 px-6 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
           Autorizar en TMDB
         </button>
-        <button (click)="closeTmdbAuthModal()" class="py-2 px-6 bg-gray-300 text-#555 rounded-md hover:bg-gray-400 transition-colors">
+        <button (click)="closeTmdbAuthModal()" class="py-2 px-6 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors">
           Cancelar
         </button>
       </div>
-
     </div>
   </div>
 </div>

@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
-import { catchError, map, tap, filter, take, switchMap } from 'rxjs/operators'; // Añadido switchMap
+import { catchError, map, tap, filter, take, switchMap } from 'rxjs/operators';
 
 import { CarteleraResponse, Movie } from '../interfaces/caretelera.interface';
 import { Genero, GeneroResponse as TMDBGeneroResponse} from '../interfaces/genero.interface';
@@ -9,7 +9,7 @@ import { AuthService } from './auth.service';
 import { User } from '../interfaces/usuario.interface'; // Asegúrate de que esta interfaz se ha actualizado
 import { MovieDetails } from '../interfaces/details.interface';
 import { Credits } from '../interfaces/credits.interface';
-import { TmdbService } from './tmdb.service'; // ¡Importar TmdbService!
+import { TmdbService } from './tmdb.service';
 
 
 @Injectable({
@@ -19,7 +19,7 @@ export class PeliculasService {
 
   // Esta API Key es la tuya, no la del usuario. Se usa para las llamadas "generales" de la app
   // (ej. cartelera, búsqueda general, géneros)
-  private apiKeyV3 = '478f17163f77c5b4c7a1834e04f2ea47';
+  private apiKeyV3App = '478f17163f77c5b4c7a1834e04f2ea47'; // Renombrada para mayor claridad
   private URL = 'https://api.themoviedb.org/3';
   private carteleraPage = 1;
   public cargando: boolean = false;
@@ -28,7 +28,7 @@ export class PeliculasService {
   public favoriteMovies$ = this._favoriteMovies.asObservable();
 
   private favoritesLoadedForCurrentSession: boolean = false;
-  private currentAccountId: string | null = null;
+  private currentTmdbAccountId: string | null = null; // Usar el ID de cuenta REAL de TMDB
   private _genres = new BehaviorSubject<Genero[]>([]);
   public genres$: Observable<Genero[]> = this._genres.asObservable();
 
@@ -36,26 +36,26 @@ export class PeliculasService {
   constructor(
     private http: HttpClient,
     private authService: AuthService,
-    private tmdbService: TmdbService // ¡Inyectar TmdbService!
+    private tmdbService: TmdbService
   ) {
     // Suscribirse a los cambios del usuario para resetear/cargar favoritos
     this.authService.currentUser.pipe(
-      // Solo actuar cuando el usuario no es undefined (logueado o con datos cargados)
       filter(user => user !== undefined),
       tap(user => {
-        const newAccountId = user ? user.account_id : null;
-        const newSessionId = user ? user.tmdb_session_id : null;
-        const newTmdbApiKey = user ? user.api_movies : null;
+        // Corrección aquí: Usar ?? null para asegurar que undefined se convierta a null
+        const newTmdbAccountIdReal = user?.tmdb_user_account_id ?? null; // El ID de cuenta REAL de TMDB
+        const newTmdbSessionId = user?.tmdb_session_id ?? null;
+        const newTmdbV3ApiKey = user?.account_id ?? null; // La V3 Key del usuario
 
-        // Si el account_id ha cambiado o si no hemos cargado favoritos para esta sesión aún
-        // y el usuario tiene un account_id, session_id y API Key válidos
-        if (this.currentAccountId !== newAccountId || (newAccountId && newSessionId && newTmdbApiKey && !this.favoritesLoadedForCurrentSession)) {
+        // Si el ID de cuenta REAL de TMDB ha cambiado o si no hemos cargado favoritos para esta sesión aún
+        // y el usuario tiene el ID de cuenta REAL, Session ID y V3 API Key válidos
+        if (this.currentTmdbAccountId !== newTmdbAccountIdReal || (newTmdbAccountIdReal && newTmdbSessionId && newTmdbV3ApiKey && !this.favoritesLoadedForCurrentSession)) {
           this.resetFavoriteMovies(); // Resetear siempre al cambiar de usuario o si no se han cargado
-          this.currentAccountId = newAccountId; // Actualizar el ID de cuenta actual
+          this.currentTmdbAccountId = newTmdbAccountIdReal; // Ahora esto será string | null
 
-          if (newAccountId && newSessionId && newTmdbApiKey) {
-            console.log(`PeliculasService: Detectado nuevo usuario o sesión (${newAccountId}). Cargando favoritos.`);
-            this.loadFavoriteMovies(newAccountId).subscribe({
+          if (newTmdbAccountIdReal && newTmdbSessionId && newTmdbV3ApiKey) {
+            console.log(`PeliculasService: Detectado nuevo usuario o sesión (${newTmdbAccountIdReal}). Cargando favoritos.`);
+            this.loadFavoriteMovies(newTmdbAccountIdReal).subscribe({
               next: () => console.log('PeliculasService: Favoritos cargados exitosamente para el nuevo usuario.'),
               error: (err) => console.error('PeliculasService: Error al cargar favoritos para el nuevo usuario:', err.message || err)
             });
@@ -66,7 +66,7 @@ export class PeliculasService {
       })
     ).subscribe();
 
-    this.loadGenres(); // Carga los géneros al inicializar el servicio
+    this.loadGenres();
   }
 
   private resetFavoriteMovies(): void {
@@ -81,10 +81,10 @@ export class PeliculasService {
     console.log('PeliculasService: Página de cartelera reseteada a 1.');
   }
 
-  // Este método usa tu API Key general para la aplicación
+  // Este método usa tu API Key general para la aplicación (la que usas para calls públicas)
   private getBaseHttpParamsV3(): HttpParams {
     return new HttpParams()
-      .set('api_key', this.apiKeyV3) // Usar la API Key V3 del servicio (tuya)
+      .set('api_key', this.apiKeyV3App) // Usar tu API Key V3 de la aplicación
       .set('language', 'es-ES');
   }
 
@@ -211,33 +211,35 @@ export class PeliculasService {
     );
   }
 
-  loadFavoriteMovies(accountId: string): Observable<Movie[]> {
+  loadFavoriteMovies(tmdbAccountIdReal: string): Observable<Movie[]> {
     const userTmdbSessionId = this.authService.getTmdbSessionId();
-    const userTmdbApiKey = this.authService.getTmdbApiKey(); // ¡Obtener la API Key del usuario!
+    const userTmdbV3ApiKey = this.authService.getTmdbApiKey(); // Obtener la API Key V3 del usuario
 
-    if (this.favoritesLoadedForCurrentSession && this.currentAccountId === accountId && this._favoriteMovies.getValue().length > 0) {
+    // Si ya los tenemos cargados para esta sesión y usuario, y hay favoritos, devolvemos la caché.
+    if (this.favoritesLoadedForCurrentSession && this.currentTmdbAccountId === tmdbAccountIdReal && this._favoriteMovies.getValue().length > 0) {
       console.log('PeliculasService: Favoritos ya cargados para la sesión actual y usuario. Devolviendo caché.');
       return this._favoriteMovies.asObservable().pipe(take(1));
     }
 
     // Verificar si todos los datos necesarios para TMDB están disponibles
-    if (!userTmdbSessionId || !accountId || !userTmdbApiKey) {
-      const errorMessage = 'TMDB session_id, account_id, o API Key no disponible para cargar favoritos.';
+    if (!userTmdbSessionId || !tmdbAccountIdReal || !userTmdbV3ApiKey) {
+      const errorMessage = 'TMDB session_id, ID de cuenta REAL de TMDB, o API Key V3 no disponible para cargar favoritos.';
       console.error('PeliculasService: ERROR -', errorMessage);
       this.favoritesLoadedForCurrentSession = true; // Marcar como "intentado cargar" para evitar bucles
-      this._favoriteMovies.next([]); // Asegurarse de que el stream esté vacío si no hay datos
+      this._favoriteMovies.next([]);
       return throwError(() => new Error(errorMessage));
     }
 
+    // Usar HttpParams para construir los parámetros de forma segura
     const params = new HttpParams()
-      .set('api_key', userTmdbApiKey) // ¡Usar la API Key del usuario!
+      .set('api_key', userTmdbV3ApiKey) // ¡Usar la API Key V3 del usuario!
       .set('session_id', userTmdbSessionId)
       .set('language', 'es-ES')
       .set('page', '1');
 
-    console.log(`PeliculasService: Realizando petición HTTP para cargar favoritos para cuenta ${accountId} (usando session_id V3 y API Key del usuario).`);
+    console.log(`PeliculasService: Realizando petición HTTP para cargar favoritos para cuenta ${tmdbAccountIdReal} (usando session_id y API Key V3 del usuario).`);
 
-    return this.http.get<CarteleraResponse>(`${this.URL}/account/${accountId}/favorite/movies`, { params }).pipe(
+    return this.http.get<CarteleraResponse>(`${this.URL}/account/${tmdbAccountIdReal}/favorite/movies`, { params }).pipe(
       map(response => response.results),
       tap(movies => {
         console.log('PeliculasService: Favoritos cargados de TMDB (V3):', movies);
@@ -247,7 +249,7 @@ export class PeliculasService {
       catchError(error => {
         console.error('PeliculasService: Error al obtener películas favoritas de TMDB (V3):', error);
         if (error.status === 401) {
-          console.error('PeliculasService: ERROR 401 - TMDB session_id o API Key no válido o expirado. Limpiando credenciales TMDB.');
+          console.error('PeliculasService: ERROR 401 - TMDB session_id o API Key V3 no válido o expirado. Limpiando credenciales TMDB.');
           this.authService.clearTmdbSessionDetails(); // Llama al método para limpiar las credenciales TMDB
         }
         this._favoriteMovies.next([]);
@@ -257,13 +259,13 @@ export class PeliculasService {
     );
   }
 
-  toggleFavorite(accountId: string, movieId: number, favorite: boolean): Observable<any> {
+  toggleFavorite(tmdbAccountIdReal: string, movieId: number, favorite: boolean): Observable<any> {
     const userTmdbSessionId = this.authService.getTmdbSessionId();
-    const userTmdbApiKey = this.authService.getTmdbApiKey(); // ¡Obtener la API Key del usuario!
+    const userTmdbV3ApiKey = this.authService.getTmdbApiKey(); // Obtener la API Key V3 del usuario
 
     // Verificar si todos los datos necesarios para TMDB están disponibles
-    if (!userTmdbSessionId || !accountId || !userTmdbApiKey) {
-      const errorMessage = 'TMDB session_id, account_id, o API Key no disponible para alternar favorito.';
+    if (!userTmdbSessionId || !tmdbAccountIdReal || !userTmdbV3ApiKey) {
+      const errorMessage = 'TMDB session_id, ID de cuenta REAL de TMDB, o API Key V3 no disponible para alternar favorito.';
       console.error('PeliculasService: ERROR -', errorMessage);
       return throwError(() => new Error(errorMessage));
     }
@@ -275,17 +277,17 @@ export class PeliculasService {
     };
 
     const params = new HttpParams()
-      .set('api_key', userTmdbApiKey) // ¡Usar la API Key del usuario!
+      .set('api_key', userTmdbV3ApiKey) // ¡Usar la API Key V3 del usuario!
       .set('session_id', userTmdbSessionId);
 
-    console.log(`PeliculasService: Alternando favorito para película ${movieId}, estado: ${favorite} (usando session_id V3 y API Key del usuario).`);
+    console.log(`PeliculasService: Alternando favorito para película ${movieId}, estado: ${favorite} (usando session_id y API Key V3 del usuario).`);
 
-    return this.http.post(`${this.URL}/account/${accountId}/favorite`, body, { params }).pipe(
+    return this.http.post(`${this.URL}/account/${tmdbAccountIdReal}/favorite`, body, { params }).pipe(
       tap(response => {
         console.log('PeliculasService: Respuesta de TMDB al alternar favorito (V3):', response);
         this.favoritesLoadedForCurrentSession = false; // Invalidar caché
         console.log('PeliculasService: Forzando recarga de favoritos después del toggle (invalidando caché).');
-        this.loadFavoriteMovies(accountId).subscribe({
+        this.loadFavoriteMovies(tmdbAccountIdReal).subscribe({
           next: () => console.log('PeliculasService: Favoritos recargados con éxito tras toggle.'),
           error: (err) => console.error('PeliculasService: Error al recargar favoritos después del toggle:', err.message || err)
         });
@@ -293,7 +295,7 @@ export class PeliculasService {
       catchError(error => {
         console.error('PeliculasService: Error al alternar favorito en TMDB (V3):', error);
         if (error.status === 401) {
-          console.error('PeliculasService: ERROR 401 - TMDB session_id o API Key no válido o expirado. Limpiando credenciales TMDB.');
+          console.error('PeliculasService: ERROR 401 - TMDB session_id o API Key V3 no válido o expirado. Limpiando credenciales TMDB.');
           this.authService.clearTmdbSessionDetails(); // Llama al método para limpiar las credenciales TMDB
         }
         this.favoritesLoadedForCurrentSession = false;
@@ -304,9 +306,9 @@ export class PeliculasService {
 
   isMovieFavorite(movieId: number): Observable<boolean> {
     const currentUser = this.authService.currentUserValue;
-    // Ahora también verificamos si hay TMDB session_id y API Key para que la funcionalidad de favoritos sea consistente
-    if (!currentUser || currentUser.account_id === null || currentUser.tmdb_session_id === null || this.authService.getTmdbApiKey() === null) {
-      return of(false); // No puede ser favorito si no hay credenciales TMDB
+    // Ahora verificamos si hay ID de cuenta REAL, Session ID y API Key V3
+    if (!currentUser || currentUser.tmdb_user_account_id === null || currentUser.tmdb_session_id === null || this.authService.getTmdbApiKey() === null) {
+      return of(false); // No puede ser favorito si no hay credenciales TMDB completas
     }
 
     return this._favoriteMovies.asObservable().pipe(
