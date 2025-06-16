@@ -1,6 +1,12 @@
 <h1 class="text-capitalize">Buscar Películas <small *ngIf="texto">{{texto}}</small></h1>
 <hr>
 
+<div class="mb-3 d-flex justify-content-end">
+    <button class="btn btn-info" (click)="goToMenu()">
+        Volver al Menú
+    </button>
+</div>
+
 <div class="search-form-container">
     <div class="form-group">
         <label for="searchQuery">Título de la película:</label>

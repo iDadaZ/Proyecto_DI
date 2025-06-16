@@ -10,3 +10,22 @@ h3{
     margin-right: 2px;
     color: #edb867;
 }
+
+.favorite-icon {
+  color: white; /* Color por defecto, si no es favorito */
+  transition: color 0.2s ease-in-out;
+}
+
+.favorite-icon.is-favorite {
+  color: gold;
+}
+
+.favorite-icon.not-favorite {
+  color: lightgray;
+}
+
+/* al pasar el ratón por encima */
+.favorite-icon.cursor:hover {
+  cursor: pointer;
+  transform: scale(1.1);
+}

@@ -100,12 +100,9 @@ export class BuscarComponent implements OnInit, OnDestroy {
       if (this.selectedMovie) {
         this.selectedMovie.isFavorite = this.favoriteMovieIds.has(this.selectedMovie.id);
       }
-      // Vuelve a aplicar el filtro de favoritos por si el estado actual ha cambiado
-      // y la película ya no cumple el criterio (ej. si era favorita y se eliminó).
-      // Esto solo si el filtro de favoritos está activo.
-      if (this.filterFavorites === 'favorites' || this.filterFavorites === 'not_favorites') {
-        this.performSearchLogic().subscribe(); // Re-ejecuta la búsqueda para aplicar el filtro
-      }
+      // NOTA: No necesitamos llamar a performSearchLogic aquí.
+      // Si el filtro de favoritos está activo, performSearchLogic ya manejará la carga.
+      // La actualización de `isFavorite` en `this.movies` ya es suficiente para el renderizado.
     });
 
     this.searchTerms.pipe(
@@ -158,6 +155,8 @@ export class BuscarComponent implements OnInit, OnDestroy {
       takeUntil(this.unsubscribe$)
     ).subscribe((params: Params) => {
       const routeText = params['texto'];
+      // Asegurarse de que esta lógica solo se ejecute si realmente hay un 'texto' en la ruta
+      // y si no hay otros filtros avanzados aplicados que ya dispararían performSearchLogic.
       if (routeText && (!this.searchQuery || this.searchQuery === '') && !this.selectedGenre && this.filterFavorites === 'all' && this.currentPage === 1) {
         this.texto = routeText;
         this.searchQuery = routeText;
@@ -186,21 +185,51 @@ export class BuscarComponent implements OnInit, OnDestroy {
     });
   }
 
+  // MODIFICACIÓN CLAVE AQUÍ: Lógica para decidir qué API llamar (favoritos vs. búsqueda/discover)
   private performSearchLogic(): Observable<CarteleraResponse> {
     this.loading = true;
     this.errorMessage = null;
     this.noMovie = '';
 
-    const filters = {
-      genreId: this.selectedGenre !== null ? this.selectedGenre : undefined,
-    };
+    const tmdbAccountIdReal = this.authService.getTmdbAccountId();
+    let apiCall: Observable<CarteleraResponse>;
 
-    return this.peliculasSvc.searchMoviesAdvanced(
-      this.searchQuery.trim(),
-      this.currentPage,
-      filters
-    ).pipe(
-      map((response: CarteleraResponse) => this.applyClientSideFavoriteFilter(response)),
+    if (this.filterFavorites === 'favorites' && tmdbAccountIdReal) {
+      // Si el filtro es "Solo mis favoritas", llamamos directamente a la API de favoritos.
+      // Se limpian los otros filtros porque no son aplicables a la API de favoritos.
+      this.searchQuery = '';
+      this.selectedGenre = null;
+
+      console.log('[BuscarComponent] Ejecutando lógica para "Solo mis favoritos".');
+      apiCall = this.peliculasSvc.loadFavoriteMovies(tmdbAccountIdReal, this.currentPage);
+    } else {
+      // Si no es el filtro de favoritos, procedemos con la búsqueda avanzada/discover normal.
+      const filters = {
+        genreId: this.selectedGenre !== null ? this.selectedGenre : undefined,
+      };
+      apiCall = this.peliculasSvc.searchMoviesAdvanced(
+        this.searchQuery.trim(),
+        this.currentPage,
+        filters
+      );
+    }
+
+    // Procesa la respuesta de cualquiera de las llamadas a la API
+    return apiCall.pipe(
+      // MODIFICACIÓN: applyClientSideFavoriteFilter solo se aplica si NO estamos en 'favorites'
+      map((response: CarteleraResponse) => {
+        if (this.filterFavorites === 'favorites') {
+          // Si ya cargamos de la API de favoritos, no hay necesidad de filtrar de nuevo.
+          // Además, la API de favoritos ya devuelve solo los favoritos, por lo que no es necesario filtrar por isFavorite.
+          return response;
+        } else if (this.filterFavorites === 'not_favorites' && tmdbAccountIdReal) {
+          // Si es "No Favoritas", aplicamos el filtro del lado del cliente.
+          const filteredResults = response.results.filter(movie => !this.favoriteMovieIds.has(movie.id));
+          return { ...response, results: filteredResults, total_results: filteredResults.length };
+        }
+        // Si es 'all' o 'favorites' (ya manejado arriba), simplemente devuelve la respuesta.
+        return response;
+      }),
       tap((response: CarteleraResponse) => {
         this.movies = response.results.map((movie: Movie) => ({
           ...movie,
@@ -229,13 +258,9 @@ export class BuscarComponent implements OnInit, OnDestroy {
   }
 
   private applyClientSideFavoriteFilter(response: CarteleraResponse): CarteleraResponse {
+
     if (this.filterFavorites === 'favorites') {
-      if (!this.tmdbAccountId) {
-        console.warn('Inicia sesión con TMDB para filtrar por favoritos.');
-        return { ...response, results: [], total_results: 0 };
-      }
-      const filteredResults = response.results.filter(movie => this.favoriteMovieIds.has(movie.id));
-      return { ...response, results: filteredResults, total_results: filteredResults.length };
+        return response;
     } else if (this.filterFavorites === 'not_favorites') {
       if (!this.tmdbAccountId) {
         console.warn('Inicia sesión con TMDB para usar el filtro de "No Favoritas".');
@@ -261,12 +286,28 @@ export class BuscarComponent implements OnInit, OnDestroy {
       this.loading = true;
       this.errorMessage = null;
       this.noMovie = '';
-      this.peliculasSvc.searchMoviesAdvanced(
-        this.searchQuery.trim(),
-        this.currentPage,
-        { genreId: this.selectedGenre !== null ? this.selectedGenre : undefined }
-      ).pipe(
-        map((response: CarteleraResponse) => this.applyClientSideFavoriteFilter(response)),
+
+      const tmdbAccountIdReal = this.authService.getTmdbAccountId();
+      let apiCall: Observable<CarteleraResponse>;
+
+      if (this.filterFavorites === 'favorites' && tmdbAccountIdReal) {
+        apiCall = this.peliculasSvc.loadFavoriteMovies(tmdbAccountIdReal, this.currentPage);
+      } else {
+        apiCall = this.peliculasSvc.searchMoviesAdvanced(
+          this.searchQuery.trim(),
+          this.currentPage,
+          { genreId: this.selectedGenre !== null ? this.selectedGenre : undefined }
+        );
+      }
+
+      apiCall.pipe(
+        map((response: CarteleraResponse) => {
+          if (this.filterFavorites === 'favorites') {
+            return response;
+          } else {
+            return this.applyClientSideFavoriteFilter(response);
+          }
+        }),
         takeUntil(this.unsubscribe$)
       ).subscribe((response: CarteleraResponse) => {
         this.loading = false;
@@ -336,6 +377,7 @@ export class BuscarComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.unsubscribe$.next();
     this.unsubscribe$.complete();
+    this.subscriptions.unsubscribe();
   }
 
   viewMovieDetails(movieId: number): void {
@@ -352,23 +394,27 @@ export class BuscarComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.errorMessage = null;
 
-    try {
-      const details: MovieDetails | null | undefined = await this.peliculasSvc.getPeliculaDetalle(movie.id.toString()).toPromise();
-
-      if (details) {
-        this.selectedMovie = {
-          ...details,
-          isFavorite: this.favoriteMovieIds.has(movie.id)
-        };
-      } else {
-        throw new Error('No se encontraron detalles para la película.');
-      }
-    } catch (err: any) {
-      this.errorMessage = err.message || 'Error al cargar detalles de la película.';
-      console.error(err);
-    } finally {
-      this.loading = false;
-    }
+    this.subscriptions.add(
+      this.peliculasSvc.getPeliculaDetalle(movie.id.toString()).subscribe({
+        next: (details: MovieDetails | null) => {
+          if (details) {
+            this.selectedMovie = {
+              ...details,
+              isFavorite: this.favoriteMovieIds.has(movie.id)
+            };
+          } else {
+            this.errorMessage = 'No se encontraron detalles para la película.';
+            console.error('No se encontraron detalles para la película:', movie.id);
+          }
+          this.loading = false;
+        },
+        error: (err) => {
+          this.errorMessage = err.message || 'Error al cargar detalles de la película.';
+          console.error('Error al cargar detalles de la película:', err);
+          this.loading = false;
+        }
+      })
+    );
   }
 
   closeMovieDetails(): void {
@@ -390,12 +436,9 @@ export class BuscarComponent implements OnInit, OnDestroy {
     this.loading = true;
     this.errorMessage = null;
 
-    // Llamar al servicio PeliculasService para alternar el favorito
     this.subscriptions.add(
       this.peliculasSvc.toggleFavorite(tmdbAccountIdReal, movieId, !isCurrentlyFavorite).pipe(
-        // El `tap` en PeliculasService ya se encarga de recargar los favoritos globales
-        // por lo que no necesitamos un `.subscribe()` aquí para actualizar la lista.
-        // La suscripción a `favoriteMovies$` en ngOnInit se encargará de eso.
+
         catchError((err: any) => {
           this.errorMessage = err.error?.status_message || err.message || 'Error al actualizar favoritos.';
           console.error('Error en toggleFavorite del modal:', err);
@@ -404,31 +447,25 @@ export class BuscarComponent implements OnInit, OnDestroy {
       ).subscribe({
         next: (response) => {
           console.log('Toggle favorito desde modal exitoso:', response);
-          // Opcional: Si quieres actualizar `selectedMovie.isFavorite` inmediatamente sin esperar al BehaviorSubject,
-          // puedes hacerlo aquí, pero la suscripción a `favoriteMovies$` ya lo hará poco después.
           if (this.selectedMovie && this.selectedMovie.id === movieId) {
             this.selectedMovie.isFavorite = !isCurrentlyFavorite;
           }
         },
         error: (err) => {
-          this.errorMessage = err.message; // El catchError ya ajustó el mensaje
+          this.errorMessage = err.message;
           alert('Hubo un error al actualizar el estado de favorito. Por favor, inténtalo de nuevo.');
         },
         complete: () => {
-          this.loading = false; // Finaliza la carga independientemente del resultado
+          this.loading = false;
         }
       })
     );
   }
 
-  // --- MANEJO DEL EVENTO DE FAVORITO DEL COMPONENTE HIJO (peliculas-poster) ---
-  // Este método recibe el evento del componente peliculas-poster.
-  // Ya NO LLAMA al servicio para alternar el favorito, porque eso ya lo hace el hijo.
-  // Solo se usa si necesitas una lógica adicional en el padre después de que el toggle ocurra.
-  // En tu caso, la sincronización de `movies` y `selectedMovie` ya se hace a través de favoriteMovies$.
   onMovieToggleFavoriteFromChild(event: { movieId: number; newFavoriteStatus: boolean }): void {
     console.log(`[BuscarComponent] Evento de favorito recibido del componente hijo para película ${event.movieId}. Nuevo estado: ${event.newFavoriteStatus}`);
-    // No hagas NADA más aquí que pueda disparar otra llamada a la API o un estado incorrecto.
-    // El servicio ya se encarga de recargar los favoritos globalmente y eso actualizará la UI.
+  }
+  goToMenu(): void {
+      this.router.navigate(['/menu']);
   }
 }

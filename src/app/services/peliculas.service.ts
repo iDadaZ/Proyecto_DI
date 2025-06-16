@@ -1,3 +1,4 @@
+// src/app/services/peliculas.service.ts
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
@@ -55,7 +56,8 @@ export class PeliculasService {
 
           if (newTmdbAccountIdReal && newTmdbSessionId && newTmdbV3ApiKey) {
             console.log(`PeliculasService: Detectado nuevo usuario o sesión (${newTmdbAccountIdReal}). Cargando favoritos.`);
-            this.loadFavoriteMovies(newTmdbAccountIdReal).subscribe({
+            // MODIFICACIÓN CLAVE: loadFavoriteMovies ahora devuelve CarteleraResponse
+            this.loadFavoriteMovies(newTmdbAccountIdReal, 1).subscribe({ // Pasar la página 1 para carga inicial
               next: () => console.log('PeliculasService: Favoritos cargados exitosamente para el nuevo usuario.'),
               error: (err) => console.error('PeliculasService: Error al cargar favoritos para el nuevo usuario:', err.message || err)
             });
@@ -211,46 +213,57 @@ export class PeliculasService {
     );
   }
 
-  loadFavoriteMovies(tmdbAccountIdReal: string): Observable<Movie[]> {
+  // Ahora retorna Observable<CarteleraResponse>
+  // Añadido parámetro 'page' para la paginación
+  loadFavoriteMovies(tmdbAccountIdReal: string, page: number = 1): Observable<CarteleraResponse> {
     const userTmdbSessionId = this.authService.getTmdbSessionId();
-    const userTmdbV3ApiKey = this.authService.getTmdbApiKey(); // Obtener la API Key V3 del usuario
+    const userTmdbV3ApiKey = this.authService.getTmdbApiKey();
 
-    // Si ya los tenemos cargados para esta sesión y usuario, y hay favoritos, devolvemos la caché.
-    if (this.favoritesLoadedForCurrentSession && this.currentTmdbAccountId === tmdbAccountIdReal && this._favoriteMovies.getValue().length > 0) {
-      console.log('PeliculasService: Favoritos ya cargados para la sesión actual y usuario. Devolviendo caché.');
-      return this._favoriteMovies.asObservable().pipe(take(1));
+    // Lógica de caché para retornar CarteleraResponse
+    // Si la página es la 1 y ya están cargados los favoritos para esta sesión/usuario.
+    if (page === 1 && this.favoritesLoadedForCurrentSession && this.currentTmdbAccountId === tmdbAccountIdReal && this._favoriteMovies.getValue().length > 0) {
+      console.log('PeliculasService: Favoritos de la primera página ya cargados para la sesión actual y usuario. Devolviendo caché.');
+      return of({
+        page: 1,
+        results: this._favoriteMovies.getValue(),
+        total_pages: 1, // Si TMDB no devuelve paginación para favoritos, asume 1 página.
+        total_results: this._favoriteMovies.getValue().length,
+        dates: { maximum: '', minimum: '' } as CarteleraResponse['dates']
+      } as CarteleraResponse);
     }
 
     // Verificar si todos los datos necesarios para TMDB están disponibles
     if (!userTmdbSessionId || !tmdbAccountIdReal || !userTmdbV3ApiKey) {
       const errorMessage = 'TMDB session_id, ID de cuenta REAL de TMDB, o API Key V3 no disponible para cargar favoritos.';
       console.error('PeliculasService: ERROR -', errorMessage);
-      this.favoritesLoadedForCurrentSession = true; // Marcar como "intentado cargar" para evitar bucles
+      this.favoritesLoadedForCurrentSession = true;
       this._favoriteMovies.next([]);
       return throwError(() => new Error(errorMessage));
     }
 
-    // Usar HttpParams para construir los parámetros de forma segura
     const params = new HttpParams()
-      .set('api_key', userTmdbV3ApiKey) // ¡Usar la API Key V3 del usuario!
+      .set('api_key', userTmdbV3ApiKey)
       .set('session_id', userTmdbSessionId)
       .set('language', 'es-ES')
-      .set('page', '1');
+      .set('page', page.toString());
 
-    console.log(`PeliculasService: Realizando petición HTTP para cargar favoritos para cuenta ${tmdbAccountIdReal} (usando session_id y API Key V3 del usuario).`);
+    console.log(`PeliculasService: Realizando petición HTTP para cargar favoritos para cuenta ${tmdbAccountIdReal}, página ${page} (usando session_id y API Key V3 del usuario).`);
 
     return this.http.get<CarteleraResponse>(`${this.URL}/account/${tmdbAccountIdReal}/favorite/movies`, { params }).pipe(
-      map(response => response.results),
-      tap(movies => {
-        console.log('PeliculasService: Favoritos cargados de TMDB (V3):', movies);
-        this._favoriteMovies.next(movies);
-        this.favoritesLoadedForCurrentSession = true;
+      tap(response => {
+        console.log('PeliculasService: Favoritos cargados de TMDB (V3):', response.results);
+        if (page === 1) {
+          this._favoriteMovies.next(response.results);
+          this.favoritesLoadedForCurrentSession = true;
+        } else {
+          console.warn('PeliculasService: Se cargó una página de favoritos que no es la primera. El BehaviorSubject favoriteMovies$ solo contiene la primera página.');
+        }
       }),
       catchError(error => {
         console.error('PeliculasService: Error al obtener películas favoritas de TMDB (V3):', error);
         if (error.status === 401) {
           console.error('PeliculasService: ERROR 401 - TMDB session_id o API Key V3 no válido o expirado. Limpiando credenciales TMDB.');
-          this.authService.clearTmdbSessionDetails(); // Llama al método para limpiar las credenciales TMDB
+          this.authService.clearTmdbSessionDetails();
         }
         this._favoriteMovies.next([]);
         this.favoritesLoadedForCurrentSession = true;
@@ -287,7 +300,7 @@ export class PeliculasService {
         console.log('PeliculasService: Respuesta de TMDB al alternar favorito (V3):', response);
         this.favoritesLoadedForCurrentSession = false; // Invalidar caché
         console.log('PeliculasService: Forzando recarga de favoritos después del toggle (invalidando caché).');
-        this.loadFavoriteMovies(tmdbAccountIdReal).subscribe({
+        this.loadFavoriteMovies(tmdbAccountIdReal, 1).subscribe({
           next: () => console.log('PeliculasService: Favoritos recargados con éxito tras toggle.'),
           error: (err) => console.error('PeliculasService: Error al recargar favoritos después del toggle:', err.message || err)
         });
